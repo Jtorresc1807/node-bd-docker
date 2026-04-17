@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    ports:
+      - "82:3000"
+      # depends_on:
+      # postgres     
