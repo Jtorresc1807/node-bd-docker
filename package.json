@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "node src/index.js"
   },
-  "author": "Cristian",
+  "author": "Jaime",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mysql2": "^3.22.0",
     "sequelize": "^6.37.8"

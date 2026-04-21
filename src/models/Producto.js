@@ -25,6 +25,10 @@ const Producto = sequelize.define(
         allowNull: true
         // allowNull defaults to true
       },
+      imagen: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+      },
   },
   {
     // Other model options go here
