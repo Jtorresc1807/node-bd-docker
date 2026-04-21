@@ -3,28 +3,34 @@ services:
     container_name: backend_node
     build: .
     ports:
-      - "82:3000"
+      - "81:3000"
     depends_on:
      - base_datos_mysql
-
-  base_datos_mysql: 
+  
+  base_datos_mysql:
     container_name: base_datos_mysql
     image: mysql:latest
     environment:
       MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bd_base_defecto
+      MYSQL_PASSWORD: userpassword
     ports:
-      - "3333:3306"
+      - "3306:3306"
     volumes:
-      - ./mysql_data_service:/var/lib/mysql
-
+      - mysql_data_service:/var/lib/mysql
+  
   db_phpmyadmin:
     container_name: db_phpmyadmin
     image: phpmyadmin/phpmyadmin
     environment:
       PMA_HOST: base_datos_mysql
       PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: root
+      PMA_USER: root
+      PMA_PASSWORD: root
     ports:
       - "7777:80"
     depends_on:
       - base_datos_mysql
+
+volumes:
+  mysql_data_service:

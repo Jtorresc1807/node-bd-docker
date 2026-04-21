@@ -1,16 +1,17 @@
 {
   "name": "bd-docker",
   "version": "1.0.0",
-  "description": "",
-  "license": "MIT",
-  "author": "Jaime",
-  "type": "commonjs",
+  "description": "node con docker",
   "main": "index.js",
   "scripts": {
     "dev": "node src/index.js"
   },
+  "author": "Cristian",
+  "license": "MIT",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mysql2": "^3.22.0",
+    "sequelize": "^6.37.8"
   },
   "devDependencies": {
     "morgan": "^1.10.1"
