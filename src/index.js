@@ -1,17 +1,24 @@
 const express = require("express");
-const productoController = require("./../controllers/producto.controller")
+require("dotenv").config();
+const router = require("./router");
 
-const Router = express.Router();
+const User = require("./models/User");
+const Producto = require("./models/Producto");
+// inicializando una app de express
+const app = express();
 
-// CRUD Productos
-Router.get("/producto", productoController.listar);
-Router.post("/producto", productoController.guardar);
-Router.get("/producto/:id", productoController.mostrar);
-Router.put("/producto/:id", productoController.modificar);
-Router.delete("/producto/:id", productoController.eliminar);
+// datos en formato json
+app.use(express.json());
 
-// CRUD Usuarios
+// crear variables
+const port = process.env.PORT || 3000;
 
+app.get("/", function(req, res){
+    return res.json({mensaje: "Saludos desde mi App de Node (MODIFICADO) último 3"});
+});
 
+app.use("/api", router)
 
-module.exports = Router;
+app.listen(port, function(){
+    console.log("Servidor corriendo en el puerto 3000 (ultima modificación) 3");
+})
