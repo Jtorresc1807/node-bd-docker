@@ -1,0 +1,315 @@
+########### package.json
+
+{
+  "name": "bd-docker", 			##El nombre del proyecto o carpeta
+  "version": "1.0.0",  			##La versión actual
+  "description": "node con docker",  	##breve explicación de qué hace el proyecto
+  "main": "index.js",  			##El punto de entrada principal de la aplicación
+  "scripts": {
+    "dev": "node src/index.js"  	## Alias para ejcutar npm run dev
+  },
+  "author": "Jaime",
+  "license": "MIT",     		##Tipo de licencia
+  "dependencies": {
+    "dotenv": "^17.4.2",  		##cargar variables de entorno (como contraseñas o puertos) desde un archivo .env
+    "express": "^5.2.1",  		##El framework que usas para crear el servidor web y manejar las rutas (APIs).
+    "mysql2": "^3.22.0",  		##El "driver" o conector que permite que Node se comunique con una base de datos MySQL.
+    "sequelize": "^6.37.8"  		##ORM (Object-Relational Mapping) permite interactuar con la base de datos usando código de JavaScript en lugar de escribir consultas SQL puras.
+  },
+  "devDependencies": {
+    "morgan": "^1.10.1"  		##muestra en la consola cada petición HTTP que llega al servidor (logs)
+  }
+}
+
+
+########### Dockerfile 
+ 
+FROM node:24  				# Usa la version 24 de Node
+WORKDIR /app 				# Crea directorio de trabajo app donde estara el codigo de node
+COPY package*.json ./  			# Envia los archivo .json a la carpeta del directorio .app
+RUN npm install  			# Instala todos los paquetes para node
+COPY . . 				# copia tado el codigo de src al espacio de trabajo
+EXPOSE 3000 				# Puerto expuesto para la conexion
+CMD ["node", "src/index.js"]  		# Levanta el proyecto
+
+
+
+########### docker-compose.yml
+
+
+
+services: 						# Define el grupo de contenedores que conforman la aplicación
+  backend_node: 					# Nombre del servicio para la aplicación Node.js
+    container_name: backend_node 			# Nombre que tendrá el contenedor al ejecutarse
+    build: 						# Instrucciones para construir la imagen personalizada
+      context: ./ 					# Ubicación de los archivos del proyecto (carpeta actual)
+      dockerfile: Dockerfile 				# Nombre del archivo con las reglas de construcción
+    ports: 						# Configuración de comunicación con el exterior
+      - "81:3000" 					# Mapea el puerto 81 de tu PC al 3000 interno del contenedor
+    environment: 					# Variables de entorno para configurar la app
+      PORT: ${PORT} 					# Toma el valor del puerto desde un archivo .env externo
+    depends_on: 					# Establece el orden de encendido
+      - base_datos_mysql 				# Indica que Node no arrancará hasta que la DB esté lista
+    restart: unless-stopped 				# Se reinicia solo si falla, a menos que tú lo detengas
+
+  base_datos_mysql: 					# Nombre del servicio de la base de datos
+    container_name: base_datos_mysql 			# Nombre del contenedor para la base de datos
+    image: mysql:latest 				# Descarga la versión más reciente de MySQL oficial
+    environment: 					# Configuración inicial de seguridad y datos
+      MYSQL_ROOT_PASSWORD: root 			# Define la contraseña maestra del administrador
+      MYSQL_DATABASE: bd_base_defecto 			# Crea automáticamente esta base de datos al iniciar
+      MYSQL_PASSWORD: userpassword 			# Define la contraseña para un usuario normal
+    ports: 						# Puertos para la base de datos
+      - "3306:3306" 					# Puerto estándar de MySQL abierto hacia tu computadora
+    volumes: 						# Persistencia de datos
+      - mysql_data_service:/var/lib/mysql 		# Guarda los datos en un volumen para no perderlos al borrar el contenedor
+    restart: unless-stopped 				# Mantiene la base de datos siempre encendida
+
+  db_phpmyadmin: 					# Servicio para la interfaz gráfica de la base de datos
+    container_name: db_phpmyadmin 			# Nombre del contenedor de la herramienta web
+    image: phpmyadmin/phpmyadmin 			# Usa la imagen oficial de phpMyAdmin
+    environment: 					# Configuración de conexión automática
+      PMA_HOST: base_datos_mysql 			# Le dice a phpMyAdmin a qué servidor conectarse
+      PMA_PORT: 3306 					# Puerto de comunicación interna entre contenedores
+      PMA_USER: root 					# Usuario para el inicio de sesión automático
+      PMA_PASSWORD: root 				# Contraseña para el inicio de sesión automático
+    ports: 						# Puerto para ver la interfaz en el navegador
+      - "7777:80" 					# Entrarás a ver tus tablas escribiendo localhost:7777
+    depends_on: 					# Dependencia lógica
+      - base_datos_mysql 				# No inicia sin la base de datos presente
+    restart: unless-stopped 				# Siempre activo para gestión rápida
+
+volumes: 						# Sección para definir el almacenamiento persistente
+  mysql_data_service: 					# Nombre del volumen que creaste arriba para MySQL
+
+
+
+########### src/config/conexion.js
+
+const { Sequelize } = require('sequelize');                                     // Importa la clase principal de la librería Sequelize
+
+const sequelize = new Sequelize('bd_base_defecto', 'root', 'root', {             // Crea la instancia de conexión con los parámetros de la BD
+    host: 'base_datos_mysql',                                                    // Define la dirección del servidor (nombre del servicio o IP)
+    port: 3306,                                                                  // Especifica el puerto estándar de comunicación de MySQL
+    dialect: 'mysql'                                                             // Indica que el motor de base de datos a usar es MySQL
+});
+
+async function testConexion(){                                                   // Define una función asíncrona para probar la conexión
+    try {                                                                        // Bloque de intento para manejar posibles errores
+        await sequelize.authenticate();                                          // Intenta establecer comunicación física con la base de datos
+        console.log('CONEXION CORRECTA CON BD.');                                // Si tiene éxito, imprime un mensaje de confirmación
+    } catch (error) {                                                            // Si hay un fallo, captura el error generado
+        console.error('ERROR DE CONEXION CON BD: ', error);                      // Imprime el detalle del error en la consola
+    }
+}
+
+testConexion();                                                                  // Ejecuta la función de prueba de conexión inmediatamente
+
+module.exports = sequelize;                                                      // Exporta la conexión para usarla en modelos y otros archivos
+
+
+########### .env
+
+PORT=3000							// puerto usado en el servicio para la aplicación Node.js
+
+
+########### index.js
+
+const express = require("express");                                              	// Importa el framework Express para crear el servidor web
+require("dotenv").config();                                                     	// Carga las variables de entorno desde el archivo .env
+const router = require("./router");                                              	// Importa el archivo de rutas centralizado de la aplicación
+
+const User = require("./models/User");                                           	// Carga el modelo de Usuario para interactuar con esa tabla
+const Producto = require("./models/Producto");                                   	// Carga el modelo de Producto para interactuar con esa tabla
+
+const app = express();                                                           	// Inicializa la instancia de la aplicación Express
+
+app.use(express.json());                                                         	// Middleware para permitir que la app reciba y entienda JSON
+
+const port = process.env.PORT || 3000;                                           	// Define el puerto desde el .env o usa el 3000 por defecto
+
+app.get("/", function(req, res){                                                 	// Define una ruta raíz (GET /) para probar el servidor
+    return res.json({mensaje: "Saludos desde mi App de Node (MODIFICADO) último 3"});	// Responde con un objeto JSON de saludo
+});
+
+app.use("/api", router)                                                          	// Monta todas las rutas del archivo router bajo el prefijo /api
+
+app.listen(port, function(){                                                     	// Inicia el servidor y lo pone a escuchar peticiones
+    console.log("Servidor corriendo en el puerto 3000 (ultima modificación) 3"); 	// Imprime en consola que el servidor está activo
+})
+
+
+
+########### router/index.js
+
+const express = require("express");                                              // Importa Express para acceder a sus funciones de enrutado
+const productoController = require("./../controllers/producto.controller")        // Importa el controlador que contiene la lógica de productos
+
+const Router = express.Router();                                                 // Crea un objeto Router independiente para gestionar rutas
+
+// CRUD Productos
+Router.get("/producto", productoController.listar);                              // Ruta para obtener la lista de todos los productos
+Router.post("/producto", productoController.guardar);                            // Ruta para crear y guardar un nuevo producto
+Router.get("/producto/:id", productoController.mostrar);                         // Ruta para obtener un solo producto mediante su ID
+Router.put("/producto/:id", productoController.modificar);                       // Ruta para actualizar los datos de un producto específico
+Router.delete("/producto/:id", productoController.eliminar);                     // Ruta para borrar un producto del sistema
+
+// CRUD Usuarios                                                                 // Espacio reservado para las futuras rutas de usuarios
+
+module.exports = Router;                                                         // Exporta el enrutador para que el index principal lo use
+
+
+########### User.js
+
+
+const { Sequelize, DataTypes } = require('sequelize');                        	 	// Importa las herramientas para definir tipos de datos
+const sequelize = require("./../config/conexion");                               // Importa la instancia de conexión configurada previamente
+
+const User = sequelize.define(                                                   // Define el modelo 'User' que se convertirá en una tabla
+  'User',                                                                        // Nombre interno del modelo
+  {                                                                              // Inicio de la definición de las columnas (atributos)
+    name: {                                                                      // Define la columna 'name'
+      type: DataTypes.STRING(50),                                                // Tipo de dato: Cadena de texto de máximo 50 caracteres
+      allowNull: false,                                                          // Obliga a que este campo no sea nulo (es requerido)
+    },
+    email: {                                                                     // Define la columna 'email'
+      type: DataTypes.STRING(250),                                               // Tipo de dato: Cadena de texto de máximo 250 caracteres
+      allowNull: false,                                                          // Campo obligatorio para el registro del usuario
+    },
+    password: {                                                                  // Define la columna 'password'
+        type: DataTypes.STRING(250),                                             // Tipo de dato: Cadena larga (ideal para contraseñas cifradas)
+        allowNull: false,                                                        // Campo obligatorio por seguridad
+      },
+  },
+  {
+    // Aquí podrías poner opciones como timestamps: true o tableName: 'usuarios'
+  },
+);
+
+User.sync()                                                                      // Sincroniza el modelo: crea la tabla si no existe en la BD
+
+module.exports = User;                                                           // Exporta el modelo para realizar consultas desde otros archivos
+
+
+
+
+########### Producto.js
+
+
+const { Sequelize, DataTypes } = require('sequelize');                        // Importa la clase principal y los tipos de datos de Sequelize
+const sequelize = require("./../config/conexion");                               // Importa la configuración de la conexión a la base de datos
+
+const Producto = sequelize.define(                                               // Define el modelo 'Producto' vinculado a una tabla de la BD
+  'Producto',                                                                    // Nombre del modelo en el código
+  {                                                                              // Inicio de la configuración de columnas de la tabla
+    nombre: {                                                                    // Define la columna para el nombre del producto
+      type: DataTypes.STRING(200),                                               // Tipo: Cadena de texto de hasta 200 caracteres
+      allowNull: false,                                                          // El nombre es obligatorio (no puede ser nulo)
+    },
+    precio: {                                                                    // Define la columna para el valor monetario
+      type: DataTypes.DECIMAL(12, 2),                                            // Tipo: Decimal (12 dígitos en total, 2 para centavos)
+      allowNull: true,                                                           // Se permite que esté vacío temporalmente
+    },
+    stock: {                                                                     // Define la columna para la cantidad de inventario
+        type: DataTypes.INTEGER,                                                 // Tipo: Número entero
+        allowNull: true,                                                         // No es obligatorio al crear el registro
+        defaultValue: 0                                                          // Si no se envía un valor, se guarda como cero (0)
+      },
+      descripcion: {                                                             // Define la columna para detalles adicionales
+        type: DataTypes.TEXT,                                                    // Tipo: Texto largo (sin límite de caracteres corto)
+        allowNull: true                                                          // Es un campo opcional
+      },
+      imagen: {                                                                  // Define la columna para la ruta o URL de la imagen
+        type: DataTypes.STRING(200),                                             // Tipo: Cadena de texto para guardar el nombre del archivo
+        allowNull: true,                                                         // Es un campo opcional
+      },
+  },
+  {
+    // Opciones adicionales como timestamps o nombres de tabla personalizados
+  },
+);
+
+Producto.sync()                                                                  // Sincroniza el modelo: crea la tabla 'Productos' si no existe
+
+module.exports = Producto;                                                       // Exporta el modelo para usarlo en controladores y rutas
+
+
+
+########## producto.controller.js
+
+
+const Producto = require("./../models/Producto");                                // Importa el modelo para realizar operaciones en la BD
+
+async function listar(req, res){                                                 // Función para obtener todos los registros
+    try {                                                                        // Inicia bloque de seguridad para capturar errores
+        const productos = await Producto.findAll();                              // Ejecuta: SELECT * FROM productos (promesa asíncrona)
+        return res.status(200).json(productos);                                  // Responde con éxito (200) enviando la lista de productos
+    } catch (error) {                                                            // Captura fallos si la base de datos no responde
+        console.log(error);                                                      // Muestra el error técnico en la consola del servidor
+        return res.status(500).json({mensaje: "Error al obtener los productos"}) // Responde con error de servidor (500) al cliente
+    }
+}
+
+async function guardar(req, res){                                                // Función para crear un nuevo registro
+    try {                                                                        // Inicia bloque de seguridad
+        await Producto.create(req.body);                                         // Toma los datos del formulario y los inserta en la BD
+        return res.status(201).json({mensaje: "Producto registrado"})            // Responde con éxito de creación (201)
+    } catch (error) {                                                            // Captura fallos de validación o conexión
+        console.log(error);                                                      // Muestra el detalle del error en consola
+        return res.status(500).json({mensaje: "Error al guardar producto"})      // Responde con error al cliente
+    }
+}
+
+async function mostrar(req, res){                                                // Función para buscar un producto específico por ID
+    try {                                                                        // Inicia bloque de seguridad
+        const {id} = req.params;                                                 // Extrae el ID enviado en la URL (ej: /producto/5)
+        const producto = await Producto.findByPk(id);                            // Busca el registro por su Llave Primaria (ID)
+        return res.status(200).json(producto);                                   // Retorna el producto encontrado al cliente
+    } catch (error) {                                                            // Captura errores de búsqueda
+        console.log(error);                                                      // Loguea el fallo
+        return res.status(500).json({mensaje: "Error al mostrar el producto"})   // Informa del error al usuario
+    }
+}
+
+async function modificar(req, res){                                              // Función para actualizar datos existentes
+    try {                                                                        // Inicia bloque de seguridad
+        const {id} = req.params;                                                 // Identifica qué producto se va a cambiar
+        const producto = await Producto.findByPk(id);                            // Primero busca el producto en la base de datos
+        await producto.update(req.body)                                          // Aplica los nuevos cambios enviados en la petición
+        return res.status(200).json(producto);                                   // Retorna el producto ya actualizado
+    } catch (error) {                                                            // Captura errores en la actualización
+        return res.status(500).json({mensaje: "Error al modificar el producto"}) // Responde con error
+    }
+}
+
+async function eliminar(req, res){                                               // Función para borrar un registro
+    try {                                                                        // Inicia bloque de seguridad
+        const { id } = req.params;                                               // Obtiene el ID del producto a eliminar
+        const producto = await Producto.findByPk(id);                            // Localiza el producto en la BD
+        await producto.destroy();                                                // Ejecuta el borrado físico del registro
+        return res.status(200).json({mensaje: "Producto eliminado"})             // Confirma la eliminación al cliente
+    } catch (error) {                                                            // Captura errores de borrado
+        return res.status(500).json({mensaje: "Error al elimniar el Producto"}) // Responde con error
+    }
+}
+
+module.exports = {                                                               // Exporta todas las funciones como un objeto
+    listar,                                                                      // Exporta listar
+    guardar,                                                                     // Exporta guardar
+    mostrar,                                                                     // Exporta mostrar
+    eliminar,                                                                    // Exporta eliminar
+    modificar                                                                    // Exporta modificar
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

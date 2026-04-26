@@ -20,5 +20,5 @@ app.get("/", function(req, res){
 app.use("/api", router)
 
 app.listen(port, function(){
-    console.log("Servidor corriendo en el puerto 3000 (ultima modificación) 3");
+    console.log("Servidor corriendo en el puerto ${port} (ultima modificación) 3");
 })

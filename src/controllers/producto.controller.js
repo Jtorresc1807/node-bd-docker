@@ -56,7 +56,7 @@ async function eliminar(req, res){
         const { id } = req.params;
         const producto = await Producto.findByPk(id);
 
-        producto.destroy();
+        await producto.destroy();
         return res.status(200).json({mensaje: "Producto eliminado"})
 
     } catch (error) {
